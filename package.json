@@ -1,0 +1,25 @@
+{
+  "name"           : "x509-keygen"
+, "version"        : "0.0.1"
+, "description"    : "node.js module to generate self-signed certificate via openssl spawn"
+, "author": {
+    "name"           : "Marshall Rose"
+  , "email"          : "mrose17@gmail.com"
+  }
+, "repository": {
+    "type"         : "git",
+    "url"          : "https://github.com/mrose17/node-x509-keygen.git"
+  } 
+, "bugs"           : {
+    "url"          : "https://github.com/mrose17/node-x509-keygen/issues"
+  }
+, "dependencies": {
+    "underscore"   : "1.4.x"
+  }
+, "keywords"       : [ "x509", "keygen", "self-signed certificate" ]
+, "main"           : "./index.js"
+, "engines": {
+    "node"         : ">=0.10"
+  }
+, "readmeFilename" : "README.md"
+}
