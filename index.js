@@ -6,6 +6,7 @@ var spawn = require('child_process').spawn
   , fs    = require('fs')
   , os    = require('os')
   , path  = require('path')
+  , util  = require('util')
   ;
 
 
@@ -15,19 +16,19 @@ exports.x509_keygen = function(options, callback) {
   if (_.isUndefined(options.force))   options.force   = true;
   if (_.isUndefined(options.destroy)) options.destroy = true;
   if (_.isUndefined(options.logger)) {
-    options.logger = { error   : function(msg, props) { console.log(msg); console.trace(props.exception); }
+    options.logger = { error   : function(msg, props) { console.log(msg); if (props) console.log(props);  }
                      , warning : function(msg, props) { console.log(msg); if (props) console.log(props);  }
                      , notice  : function(msg, props) { console.log(msg); if (props) console.log(props);  }
                      , info    : function(msg, props) { console.log(msg); if (props) console.log(props);  }
-                     , debug   : function(msg, props) { console.log(msg); if (props) console.log(props);  }
+                     , debug   : function(msg, props) { /* jshint unused: false */                        }
                      };
   }
 
   if (_.isUndefined(options.subject)) return callback(new Error('options must include subject'));
 
   options.location = options.location || path.join(os.tmpDir(), 'server_rsa');
-  options.keyfile  = options.location + '.key';
-  options.certfile = options.location + '.cert';
+  options.keyfile  = options.keyfile  || options.location + '.key';
+  options.certfile = options.certfile || options.location + '.cert';
 
   fs.exists(options.keyfile, function(keyP) {
     if ((!options.force) && keyP)    return callback(new Error(options.keyfile  + ' already exists'));
@@ -35,14 +36,14 @@ exports.x509_keygen = function(options, callback) {
     fs.exists(options.certfile, function(certP) {
       if ((!options.force) && certP) return callback(new Error(options.certfile + ' already exists'));
 
-      if ((!keyP) && (!certP)) return inner(options, callback);
+      if ((!keyP) && (!certP)) return middle(options, callback);
 
       if (keyP) {
         fs.unlink(options.keyfile, function(err) {
           if (err) return callback(err);
           keyP = false;
 
-          if ((!keyP) && (!certP)) return inner(options, callback);
+          if ((!keyP) && (!certP)) return middle(options, callback);
         });
       }
 
@@ -51,30 +52,64 @@ exports.x509_keygen = function(options, callback) {
           if (err) return callback(err);
             certP = false;
 
-            if ((!keyP) && (!certP)) return inner(options, callback);
+            if ((!keyP) && (!certP)) return middle(options, callback);
         });
       }
     });
   });
 };
 
+var middle = function(options, callback) {
+  var config, i, ifaddrs, iface, ifaces, hostname, s;
+
+  if (!!options.configfile) return inner(options, callback);
+
+  if (!options.alternates || !util.isArray(options.alternates)) {
+    options.alternates =  [ 'DNS:localhost' ];
+    hostname = os.hostname();
+    options.alternates.push('DNS:' + ((hostname.indexOf('.') != -1) ? hostname : (hostname + '.local')));
+    
+    ifaces = os.networkInterfaces();
+    for (iface in ifaces) if (ifaces.hasOwnProperty(iface)) {
+      ifaddrs = ifaces[iface];
+      for (i = 0; i < ifaddrs.length; i++) if (ifaddrs[i].family === 'IPv4') options.alternates.push('IP:'+ifaddrs[i].address);
+    }
+  }
+  config = '[ req ]\ndistinguished_name = dn_req\nx509_extensions = v3_req\n\n[ dn_req ]\n\n[ v3_req ]\nsubjectAltName="';
+  for (i = 0, s = ''; i < options.alternates.length; i++, s = ',') config += s + options.alternates[i];
+  config += '"\n';
+
+  options.configfile = options.location + '.conf';
+  fs.writeFile (options.configfile, config, { mode: 0644 }, function(err) {
+    if (err) return callback(err);
+
+    inner(options, function(err, results) {
+      fs.unlink(options.configfile);
+      callback(err, results);
+    });
+  });
+};
+
 var inner = function(options, callback) {
-  var args  =  [ 'req',     '-x509'
-               , '-newkey', 'rsa:2048'
-               , '-days',   '3650'
-               , '-nodes'
-               , '-subj',   options.subject
-               , '-keyout', options.keyfile
-               , '-out',    options.certfile
-               ]
-    , keygen = spawn('openssl', args)
-   ;
+  var args, keygen;
+
+  args =  [ 'req',     '-x509'
+          , '-newkey', 'rsa:2048'
+          , '-days',   '3650'
+          , '-nodes'
+          , '-subj',   options.subject
+          , '-keyout', options.keyfile
+          , '-out',    options.certfile
+          ];
+  if (!!options.configfile) args.push('-config', options.configfile);
+
+  keygen = spawn('openssl', args);
 
   keygen.stdout.on('data', function(a){
     options.logger.info(a);
   });
   keygen.stderr.on('data',function(a){
-    options.logger.error('openssl: ' + a);
+    options.logger.debug('openssl: ' + a);
   });
 
   keygen.on('exit', function() {

@@ -1,9 +1,8 @@
-var keygen = require('./x509-keygen').x509_keygen;
+var keygen = require('./index').x509_keygen;
 
-keygen({ subject: '/CN=subject' }, function(err, data) {
-  if (err) { console.log('error'); console.log(err); }
+keygen({ subject: '/CN=subject', location: 'server_rsa', destroy: false }, function(err, results) {
+  if (err) return console.log('keypair generation error: ' + err.message);
 
-  console.log(data.key);
-  console.log(data.cert);
-  console.log(data.hash);
+  console.log('keypair generated.');
+  console.log(results);
 });
