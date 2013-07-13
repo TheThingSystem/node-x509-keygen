@@ -16,11 +16,11 @@ exports.x509_keygen = function(options, callback) {
   if (_.isUndefined(options.force))   options.force   = true;
   if (_.isUndefined(options.destroy)) options.destroy = true;
   if (_.isUndefined(options.logger)) {
-    options.logger = { error   : function(msg, props) { console.log(msg); if (props) console.log(props);  }
-                     , warning : function(msg, props) { console.log(msg); if (props) console.log(props);  }
-                     , notice  : function(msg, props) { console.log(msg); if (props) console.log(props);  }
-                     , info    : function(msg, props) { console.log(msg); if (props) console.log(props);  }
-                     , debug   : function(msg, props) { /* jshint unused: false */                        }
+    options.logger = { error   : function(msg, props) { console.log(msg); if (!!props) console.trace(props.exception); }
+                     , warning : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
+                     , notice  : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
+                     , info    : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
+                     , debug   : function(msg, props) { console.log(msg); if (!!props) console.log(props);             }
                      };
   }
 
