@@ -8,10 +8,10 @@
   }
 , "repository": {
     "type"         : "git",
-    "url"          : "https://github.com/mrose17/node-x509-keygen.git"
+    "url"          : "https://github.com/TheThingSystem/node-x509-keygen.git"
   } 
 , "bugs"           : {
-    "url"          : "https://github.com/mrose17/node-x509-keygen/issues"
+    "url"          : "https://github.com/TheThingSystem/node-x509-keygen/issues"
   }
 , "dependencies": {
     "underscore"   : "1.4.x"
