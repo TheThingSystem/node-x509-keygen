@@ -75,9 +75,13 @@ var middle = function(options, callback) {
       for (i = 0; i < ifaddrs.length; i++) if (ifaddrs[i].family === 'IPv4') options.alternates.push('IP:'+ifaddrs[i].address);
     }
   }
-  config = '[ req ]\ndistinguished_name = dn_req\nx509_extensions = v3_req\n\n[ dn_req ]\n\n[ v3_req ]\nsubjectAltName="';
-  for (i = 0, s = ''; i < options.alternates.length; i++, s = ',') config += s + options.alternates[i];
-  config += '"\n';
+  config = '[ req ]\ndistinguished_name = dn_req\nx509_extensions = v3_req\n\n[ dn_req ]\n\n[ v3_req ]\n';
+  config += 'basicConstraints=CA:TRUE\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n'
+  if (options.alternates.length > 0) {
+    config += 'subjectAltName="';
+    for (i = 0, s = ''; i < options.alternates.length; i++, s = ',') config += s + options.alternates[i];
+    config += '"\n';
+  }
 
   options.configfile = options.location + '.conf';
   fs.writeFile (options.configfile, config, { mode: 0644 }, function(err) {
