@@ -50,9 +50,9 @@ exports.x509_keygen = function(options, callback) {
       if (certP) {
         fs.unlink(options.certfile, function(err) {
           if (err) return callback(err);
-            certP = false;
+          certP = false;
 
-            if ((!keyP) && (!certP)) return middle(options, callback);
+          if ((!keyP) && (!certP)) return middle(options, callback);
         });
       }
     });
@@ -118,9 +118,9 @@ var inner = function(options, callback) {
         if (!options.destroy) return callback(null, { key: key, cert: cert });
 
         fs.unlink(options.certfile, function(err){
-          if(err) return callback(err);
+          if (err) return callback(err);
 
-           return callback(null, { key: key, cert: cert });
+          return callback(null, { key: key, cert: cert });
         });
       });
     };
@@ -131,7 +131,7 @@ var inner = function(options, callback) {
       if (!options.destroy) return readcert(key);
 
       fs.unlink(options.keyfile, function(err){
-        if(err) return callback(err);
+        if (err) return callback(err);
 
         readcert(key);
       });
