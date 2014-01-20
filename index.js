@@ -29,7 +29,7 @@ exports.x509_keygen = function(options, callback) {
   options.location = options.location || path.join(os.tmpDir(), 'server_rsa');
   options.keyfile  = options.keyfile  || options.location + '.key';
   options.certfile = options.certfile || options.location + '.cert';
-  options.sha1file = options.sha1file || options.location + '.cert';
+  options.sha1file = options.sha1file || options.location + '.sha1';
 
   fs.exists(options.keyfile, function(keyP) {
     if ((!options.force) && keyP)    return callback(new Error(options.keyfile  + ' already exists'));
@@ -142,10 +142,10 @@ var inner = function(options, callback) {
       hashgen.on('exit', function() {
         if (options.destroy) return readcert(key, sha1);
 
-        fs.unlink(options.shafile, function(err) {
+        fs.unlink(options.sha1file, function(err) {
           if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
 
-          fs.writeFile (options.shafile, sha1, { mode: 0444 }, function(err) {
+          fs.writeFile (options.sha1file, sha1, { mode: 0444 }, function(err) {
             if (err) return callback(err);
 
             readcert(key, sha1);
