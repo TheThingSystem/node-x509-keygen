@@ -133,7 +133,7 @@ var inner = function(options, callback) {
     var makesha1 = function(key) {
       var hashgen, sha1;
 
-      hashgen = spawn('openssl', [ 'x509', '-sha1', 'in', options.certfile, '-noout', '-fingerprint' ]);
+hashgen = spawn('openssl', [ 'x509', '-sha1', '-in', options.certfile, '-noout', '-fingerprint' ]);
       sha1 = '';
       hashgen.stdout.on('data', function(data) { sha1 += data.toString(); });
       hashgen.stderr.on('data',function(a){
