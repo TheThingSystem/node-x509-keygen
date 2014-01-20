@@ -29,6 +29,7 @@ exports.x509_keygen = function(options, callback) {
   options.location = options.location || path.join(os.tmpDir(), 'server_rsa');
   options.keyfile  = options.keyfile  || options.location + '.key';
   options.certfile = options.certfile || options.location + '.cert';
+  options.sha1file = options.sha1file || options.location + '.cert';
 
   fs.exists(options.keyfile, function(keyP) {
     if ((!options.force) && keyP)    return callback(new Error(options.keyfile  + ' already exists'));
@@ -76,7 +77,7 @@ var middle = function(options, callback) {
     }
   }
   config = '[ req ]\ndistinguished_name = dn_req\nx509_extensions = v3_req\n\n[ dn_req ]\n\n[ v3_req ]\n';
-  config += 'basicConstraints=CA:TRUE\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n'
+  config += 'basicConstraints=CA:TRUE\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid,issuer\n';
   if (options.alternates.length > 0) {
     config += 'subjectAltName="';
     for (i = 0, s = ''; i < options.alternates.length; i++, s = ',') config += s + options.alternates[i];
@@ -117,14 +118,38 @@ var inner = function(options, callback) {
   });
 
   keygen.on('exit', function() {
-    var readcert = function(key) {
+    var readcert = function(key, sha1) {
       fs.readFile(options.certfile, 'utf8', function(err, cert) {
-        if (!options.destroy) return callback(null, { key: key, cert: cert });
+        if (!options.destroy) return callback(null, { key: key, cert: cert, sha1: sha1 });
 
         fs.unlink(options.certfile, function(err){
           if (err) return callback(err);
 
-          return callback(null, { key: key, cert: cert });
+          return callback(null, { key: key, cert: cert, sha1: sha1 });
+        });
+      });
+    };
+
+    var makesha1 = function(key) {
+      var hashgen, sha1;
+
+      hashgen = spawn('openssl', [ 'x509', '-sha1', 'in', options.certfile, '-noout', '-fingerprint' ]);
+      sha1 = '';
+      hashgen.stdout.on('data', function(data) { sha1 += data.toString(); });
+      hashgen.stderr.on('data',function(a){
+        options.logger.debug('openssl: ' + a);
+      });
+      hashgen.on('exit', function() {
+        if (options.destroy) return readcert(key, sha1);
+
+        fs.unlink(options.shafile, function(err) {
+          if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
+
+          fs.writeFile (options.shafile, sha1, { mode: 0444 }, function(err) {
+            if (err) return callback(err);
+
+            readcert(key, sha1);
+          });
         });
       });
     };
@@ -132,12 +157,12 @@ var inner = function(options, callback) {
     if(!options.read) return callback(null, {});
 
     fs.readFile(options.keyfile, 'utf8', function(err, key) {
-      if (!options.destroy) return readcert(key);
+      if (!options.destroy) return makesha1(key);
 
       fs.unlink(options.keyfile, function(err){
         if (err) return callback(err);
 
-        readcert(key);
+        makesha1(key);
       });
     });
   });
