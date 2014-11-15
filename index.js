@@ -118,14 +118,40 @@ var inner = function(options, callback) {
   });
 
   keygen.on('exit', function() {
-    var readcert = function(key, sha1) {
+    var readcert = function(key, sha1, der) {
       fs.readFile(options.certfile, 'utf8', function(err, cert) {
-        if (!options.destroy) return callback(null, { key: key, cert: cert, sha1: sha1 });
+        if (!options.destroy) return callback(null, { key: key, cert: cert, sha1: sha1, der: der });
 
         fs.unlink(options.certfile, function(err){
           if (err) return callback(err);
 
-          return callback(null, { key: key, cert: cert, sha1: sha1 });
+          return callback(null, { key: key, cert: cert, sha1: sha1, der: der });
+        });
+      });
+    };
+
+    var makeder = function(key, sha1) {
+      var hashgen, der;
+
+      if (!options.derfile) return readcert(key, sha1);
+
+      hashgen = spawn('openssl', [ 'x509', '-inform', 'pem', '-outform', 'der', '-in', options.certfile ]);
+      der = null;
+      hashgen.stdout.on('data', function(data) { der = der ? Buffer.concat(der, data) : data; });
+      hashgen.stderr.on('data',function(a){
+        options.logger.debug('openssl: ' + a);
+      });
+      hashgen.on('exit', function() {
+        if (options.destroy) return readcert(key, sha1, der);
+
+        fs.unlink(options.derfile, function(err) {
+          if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
+
+          fs.writeFile (options.derfile, der, { mode: 0444 }, function(err) {
+            if (err) return callback(err);
+
+            readcert(key, sha1, der);
+          });
         });
       });
     };
@@ -140,7 +166,7 @@ var inner = function(options, callback) {
         options.logger.debug('openssl: ' + a);
       });
       hashgen.on('exit', function() {
-        if (options.destroy) return readcert(key, sha1);
+        if (options.destroy) return makeder(key, sha1);
 
         fs.unlink(options.sha1file, function(err) {
           if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
@@ -148,7 +174,7 @@ var inner = function(options, callback) {
           fs.writeFile (options.sha1file, sha1, { mode: 0444 }, function(err) {
             if (err) return callback(err);
 
-            readcert(key, sha1);
+            makeder(key, sha1);
           });
         });
       });
