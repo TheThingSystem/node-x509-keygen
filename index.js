@@ -26,10 +26,11 @@ exports.x509_keygen = function(options, callback) {
 
   if (_.isUndefined(options.subject)) return callback(new Error('options must include subject'));
 
-  options.location = options.location || path.join(os.tmpDir(), 'server_rsa');
-  options.keyfile  = options.keyfile  || options.location + '.key';
-  options.certfile = options.certfile || options.location + '.cert';
-  options.sha1file = options.sha1file || options.location + '.sha1';
+  options.location   = options.location   || path.join(os.tmpDir(), 'server_rsa');
+  options.keyfile    = options.keyfile    || options.location + '.key';
+  options.certfile   = options.certfile   || options.location + '.cert';
+  options.sha1file   = options.sha1file   || options.location + '.sha1';
+  options.sha256file = options.sha256file || options.location + '.sha256';
 
   fs.exists(options.keyfile, function(keyP) {
     if ((!options.force) && keyP)    return callback(new Error(options.keyfile  + ' already exists'));
@@ -118,22 +119,22 @@ var inner = function(options, callback) {
   });
 
   keygen.on('exit', function() {
-    var readcert = function(key, sha1, der) {
+    var readcert = function(key, sha1, sha256, der) {
       fs.readFile(options.certfile, 'utf8', function(err, cert) {
-        if (!options.destroy) return callback(null, { key: key, cert: cert, sha1: sha1, der: der });
+        if (!options.destroy) return callback(null, { key: key, cert: cert, sha1: sha1, sha256: sha256, der: der });
 
         fs.unlink(options.certfile, function(err){
           if (err) return callback(err);
 
-          return callback(null, { key: key, cert: cert, sha1: sha1, der: der });
+          return callback(null, { key: key, cert: cert, sha1: sha1, sha256: sha256, der: der });
         });
       });
     };
 
-    var makeder = function(key, sha1) {
+    var makeder = function(key, sha1, sha256) {
       var hashgen, der;
 
-      if (!options.derfile) return readcert(key, sha1);
+      if (!options.derfile) return readcert(key, sha1, sha256);
 
       hashgen = spawn('openssl', [ 'x509', '-inform', 'pem', '-outform', 'der', '-in', options.certfile ]);
       der = null;
@@ -142,7 +143,7 @@ var inner = function(options, callback) {
         options.logger.debug('openssl: ' + a);
       });
       hashgen.on('exit', function() {
-        if (options.destroy) return readcert(key, sha1, der);
+        if (options.destroy) return readcert(key, sha1, sha256, der);
 
         fs.unlink(options.derfile, function(err) {
           if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
@@ -150,7 +151,31 @@ var inner = function(options, callback) {
           fs.writeFile (options.derfile, der, { mode: 0444 }, function(err) {
             if (err) return callback(err);
 
-            readcert(key, sha1, der);
+            readcert(key, sha1, sha256, der);
+          });
+        });
+      });
+    };
+
+    var makesha256 = function(key, sha1) {
+      var hashgen, sha256;
+
+      hashgen = spawn('openssl', [ 'x509', '-sha256', '-in', options.certfile, '-noout', '-fingerprint' ]);
+      sha256 = '';
+      hashgen.stdout.on('data', function(data) { sha256 += data.toString(); });
+      hashgen.stderr.on('data',function(a){
+        options.logger.debug('openssl: ' + a);
+      });
+      hashgen.on('exit', function() {
+        if (options.destroy) return makeder(key, sha1, sha256);
+
+        fs.unlink(options.sha256file, function(err) {
+          if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
+
+          fs.writeFile (options.sha256file, sha256, { mode: 0444 }, function(err) {
+            if (err) return callback(err);
+
+            makeder(key, sha1, sha256);
           });
         });
       });
@@ -166,7 +191,7 @@ var inner = function(options, callback) {
         options.logger.debug('openssl: ' + a);
       });
       hashgen.on('exit', function() {
-        if (options.destroy) return makeder(key, sha1);
+        if (options.destroy) return makesha256(key, sha1);
 
         fs.unlink(options.sha1file, function(err) {
           if ((!!err) && (err.code !== 'ENOENT')) return callback(err);
@@ -174,7 +199,7 @@ var inner = function(options, callback) {
           fs.writeFile (options.sha1file, sha1, { mode: 0444 }, function(err) {
             if (err) return callback(err);
 
-            makeder(key, sha1);
+            makesha256(key, sha1);
           });
         });
       });
